@@ -1,0 +1,32 @@
+{
+    // IntelliSense を使用して利用可能な属性を学べます。
+    // 既存の属性の説明をホバーして表示します。
+    // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+
+
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--epochs",
+                "200",
+                "--batch-size",
+                "12",
+                "--learning-rate",
+                "5e-05",
+                // "--scale",
+                // "0.5",
+                // "--input",
+                // "ibaraki2016IW2_OUT.npy",
+                // "--model",
+                // "checkpoints/202001141609_Lr_5e-05_Bs_12/CP_epoch21.pth",
+            ]
+        }
+    ]
+}

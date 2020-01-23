@@ -13,17 +13,15 @@ from eval import eval_net
 from unet import UNet
 from utils import get_ids, split_train_val, get_imgs_and_masks, batch
 from torch.utils.tensorboard import SummaryWriter
-import datetime
-dt_now = datetime.datetime.now()
 
-dir_sar = '/home/shimosato/dataset/unet/train/sar/'
-dir_cor = '/home/shimosato/dataset/unet/train/cor/'
-dir_gt = '/home/shimosato/dataset/unet/train/gt/'
+dir_sar = '/home/shimosato/dataset/carvana-image-masking-challenge/sar/train/'
+dir_cor = '/home/shimosato/dataset/carvana-image-masking-challenge/sar/cor/'
+dir_gt = '/home/shimosato/dataset/carvana-image-masking-challenge/sar/gt/'
 dir_checkpoint = 'checkpoints/'
 
 def train_net(net,
               device,
-              epochs=5,
+              epochs=20,
               batch_size=1,
               lr=0.1,
               val_percent=0.15,
@@ -33,7 +31,7 @@ def train_net(net,
 
     iddataset = split_train_val(ids, val_percent)
 
-    writer = SummaryWriter(comment=f'_Learning_rate_{lr}_Batch_size_{batch_size}')
+    writer = SummaryWriter(comment=f'Learning_rate_{lr}_Batch_size_{batch_size}_SCALE_{img_scale}')
 
     logging.info(f'''Starting training:
         Epochs:          {epochs}
@@ -43,18 +41,18 @@ def train_net(net,
         Validation size: {len(iddataset["val"])}
         Checkpoints:     {save_cp}
         Device:          {device.type}
+        Images scaling:  {img_scale}
     ''')
 
     n_train = len(iddataset['train'])
     n_val = len(iddataset['val'])
     optimizer = optim.Adam(net.parameters(), lr=lr)
-    if net.module.n_classes > 1:
+    if net.n_classes > 1:
         criterion = nn.CrossEntropyLoss()
     else:
         # criterion = nn.BCEWithLogitsLoss()
         criterion = nn.MSELoss()        # MSE Loss
 
-    loss_min = 100
     for epoch in range(epochs):
         net.train()
 
@@ -64,7 +62,6 @@ def train_net(net,
 
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
             epoch_loss = 0
-            # epoch_loss_input = 0
             for i, b in enumerate(batch(train, batch_size)):
                 imgs_sar = np.array([i[0] for i in b]).astype(np.float32)
                 imgs_cor = np.array([i[1] for i in b]).astype(np.float32)
@@ -78,53 +75,39 @@ def train_net(net,
                 gt_mask = torch.from_numpy(gt_mask)
 
                 imgs = imgs.to(device=device)
-                # imgs_sar = imgs_sar.to(device=device)
                 gt = gt.to(device=device)
                 gt_mask = gt_mask.to(device=device)
 
-                # Check input mse_loss
-                # loss_input = criterion(imgs_sar * gt_mask, gt)
-                # epoch_loss_input += loss_input.item()
-
                 pred_def = net(imgs)
                 pred_def_mask = pred_def * gt_mask
-                gt_index = torch.nonzero(gt, as_tuple=True)
-                # loss = criterion(pred_def_mask, gt)
-                loss = criterion(pred_def[gt_index], gt[gt_index])
+                loss = criterion(pred_def_mask, gt)
                 epoch_loss += loss.item()
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
+
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
                 pbar.update(batch_size)
-            logging.info('Train Loss: {}'.format(epoch_loss))
-            writer.add_scalar('Loss/Train', epoch_loss / len(iddataset["train"]), epoch+1)
-
-
-        # val_score = eval_net(net, val, device, n_val)
-        # if net.module.n_classes > 1:
-        #     logging.info('Validation cross entropy: {}'.format(val_score))
-        #     writer.add_scalar('Loss/Validation', val_score, epoch+1)
-        # else:
-        #     logging.info('Validation MSE: {}'.format(val_score))
-        #     writer.add_scalar('Loss/Validation', val_score, epoch+1)
+            writer.add_scalar('Loss/Train', epoch_loss, epoch+1)
 
         if save_cp:
             try:
-                data_lr_Bs = dt_now.strftime('%Y%m%d%H%M')+'_Lr_'+str(lr)+'_Bs_'+str(batch_size)+'/'
-                os.mkdir(dir_checkpoint + data_lr_Bs)
+                os.mkdir(dir_checkpoint)
                 logging.info('Created checkpoint directory')
             except OSError:
                 pass
-            # torch.save(net.state_dict(), dir_checkpoint + data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
-            if loss_min >= epoch_loss:
-                torch.save(net.module.state_dict(), dir_checkpoint + data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
-                logging.info(f'Checkpoint {epoch + 1} saved !')
-                loss_min = epoch_loss
-            else:
-                logging.info(f'Skip Checkpoint {epoch + 1} !')
-    # print('Input MSE_Loss:',epoch_loss_input)
+            torch.save(net.state_dict(),
+                       dir_checkpoint + f'CP_epoch{epoch + 1}.pth')
+            logging.info(f'Checkpoint {epoch + 1} saved !')
+
+        val_score = eval_net(net, val, device, n_val)
+        if net.n_classes > 1:
+            logging.info('Validation cross entropy: {}'.format(val_score))
+            writer.add_scalar('Loss/Validation', val_score, epoch+1)
+        else:
+            logging.info('Validation Dice Coeff: {}'.format(val_score))
+            writer.add_scalar('Dice/Validation', val_score, epoch+1)
     writer.close()
 
 def get_args():
@@ -138,7 +121,7 @@ def get_args():
                         help='Learning rate', dest='lr')
     parser.add_argument('-f', '--load', dest='load', type=str, default=False,
                         help='Load model from a .pth file')
-    parser.add_argument('-s', '--scale', dest='scale', type=float, default=1,
+    parser.add_argument('-s', '--scale', dest='scale', type=float, default=0.5,
                         help='Downscaling factor of the images')
     parser.add_argument('-v', '--validation', dest='val', type=float, default=15.0,
                         help='Percent of the data that is used as validation (0-100)')
@@ -180,11 +163,8 @@ if __name__ == '__main__':
         logging.info(f'Model loaded from {args.load}')
 
     net.to(device=device)
-
-    # Multi-GPU
-    net = nn.DataParallel(net).cuda()  # make parallel
     # faster convolutions, but more memory
-    torch.backends.cudnn.benchmark = True
+    # cudnn.benchmark = True
 
 try:
     train_net(net=net,

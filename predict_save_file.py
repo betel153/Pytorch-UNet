@@ -11,12 +11,14 @@ import torch.nn.functional as F
 from unet import UNet
 from utils import plot_img_and_mask
 from utils import resize_and_crop, normalize_sar, normalize_cor, hwc_to_chw, dense_crf
-from collections import OrderedDict # Use Old dataset
+from collections import OrderedDict  # Use Old dataset
 import scipy.io as sio
 from sklearn import metrics
 import re
+import h5py
 
-dir_test = '/home/shimosato/dataset/unet/test/'
+dir_test = '/home/shimosato/dataset/unet/test/raw/'
+
 
 def predict_img(net,
                 sar,
@@ -104,7 +106,8 @@ def get_output_filenames(args):
             pathsplit = os.path.splitext(f)
             out_files.append("{}_OUT{}".format(pathsplit[0], pathsplit[1]))
     elif len(in_files) != len(args.output):
-        logging.error("Input files and output files are not of the same length")
+        logging.error(
+            "Input files and output files are not of the same length")
         raise SystemExit()
     else:
         out_files = args.output
@@ -115,10 +118,13 @@ def get_output_filenames(args):
 def mask_to_image(mask):
     return Image.fromarray((mask * 255).astype(np.uint8))
 
+
 def MinMaxScaler(sar):
     return (sar - torch.min(sar)) / (torch.max(sar) - torch.min(sar))
 
 # Use Old Dataset
+
+
 def fix_model_state_dict(state_dict):
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
@@ -128,9 +134,11 @@ def fix_model_state_dict(state_dict):
         new_state_dict[name] = v
     return new_state_dict
 
+
 def get_ids(dir):
     """Returns a list of the ids in the directory"""
     return (os.path.splitext(f)[0] for f in os.listdir(dir) if not f.startswith('.'))
+
 
 if __name__ == "__main__":
     all_train_eval = []
@@ -146,7 +154,7 @@ if __name__ == "__main__":
     e = 0
     e2 = 0
     test = 0
-    test2 =0
+    test2 = 0
     args = get_args()
     args.input = list(get_ids(dir_test + 'sar/'))
     in_files = args.input
@@ -156,7 +164,8 @@ if __name__ == "__main__":
 
     logging.info("Loading model {}".format(args.model))
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu')
     logging.info(f'Using device {device}')
     net.to(device=device)
     # Use Old dataset
@@ -173,8 +182,22 @@ if __name__ == "__main__":
         # fn = os.path.splitext(fn)[0]
 
         # Load npy file
-        sar = np.load(dir_test + 'sar/' + fn + '.npy')
-        sar_cor = np.load(dir_test + 'cor/' + fn + '_cor.npy')
+        with h5py.File(dir_test + 'sar/' + fn + '.mat', 'r') as f:
+            sar = np.transpose(f['data'][()].astype(np.float32), axes=[1, 0])
+        with h5py.File(dir_test + 'cor/' + fn + '_cor.mat', 'r') as f:
+            sar_cor = np.transpose(f['data'][()].astype(np.float32), axes=[1, 0])
+        with h5py.File(dir_test + 'gt/' + fn + '_leveling.mat', 'r') as f:
+            gt = np.transpose(f['data'][()].astype(np.float32), axes=[1, 0])
+        # gt = np.load(dir_test + 'gt/' + fn + '_leveling.npy')
+        # sar = np.load(dir_test + 'sar/' + fn + '.npy')
+        # sar_cor = np.load(dir_test + 'cor/' + fn + '_cor.npy')
+
+        s1=5000
+        s2=10000
+        s3=15000
+        sar     =     sar[s2:s3, s2:s3]
+        sar_cor = sar_cor[s2:s3, s2:s3]
+        gt      =      gt[s2:s3, s2:s3]
 
         # Normalize
         sar_norm = normalize_sar(sar)
@@ -209,31 +232,23 @@ if __name__ == "__main__":
         #     logging.info("Visualizing results for image {}, close to continue ...".format(fn))
         #     plot_img_and_mask(img, mask)
 
-        gt = np.load(dir_test + 'gt/' + fn + '_leveling.npy')
         # gt = np.expand_dims(gt, axis=2)
         # gt = hwc_to_chw(gt)
         gt_mask = np.where(gt != 0, 1, 0)  # mask
 
-
         train_mask = sar * gt_mask
         pred_mask = mask * gt_mask
-
-        # Nonzero method
-        train_mask = sar[gt.nonzero()]
-        pred_mask = mask[gt.nonzero()]
-        gt = gt[gt.nonzero()]
-
         train_vs = metrics.explained_variance_score(train_mask, gt)
         train_mae = metrics.mean_absolute_error(train_mask, gt)
         train_mse = metrics.mean_squared_error(train_mask, gt)
         train_rmse = np.sqrt(metrics.mean_squared_error(train_mask, gt))
-        # train_r2 = metrics.r2_score(train_mask, gt)
+        train_r2 = metrics.r2_score(train_mask, gt)
 
         pred_vs = metrics.explained_variance_score(pred_mask, gt)
         pred_mae = metrics.mean_absolute_error(pred_mask, gt)
         pred_mse = metrics.mean_squared_error(pred_mask, gt)
         pred_rmse = np.sqrt(metrics.mean_squared_error(pred_mask, gt))
-        # pred_r2 = metrics.r2_score(pred_mask, gt)
+        pred_r2 = metrics.r2_score(pred_mask, gt)
 
         # train_eval = [train_vs,train_mae,train_mse,train_rmse,train_r2]
         # pred_eval = [pred_vs,pred_mae,pred_mse,pred_rmse,pred_r2]
@@ -241,33 +256,29 @@ if __name__ == "__main__":
         b += train_mae
         c += train_mse
         d += train_rmse
-        # e += train_r2
+        e += train_r2
 
         a2 += pred_vs
         b2 += pred_mae
         c2 += pred_mse
         d2 += pred_rmse
-        # e2 += pred_r2
+        e2 += pred_r2
 
+        train_rmse2 = np.sqrt(metrics.mean_squared_error(sar * gt_mask, gt))
+        pred_rmse2 = np.sqrt(metrics.mean_squared_error(mask * gt_mask, gt))
+        test += train_rmse2
+        test2 += pred_rmse2
 
-        # train_rmse2 = np.sqrt(metrics.mean_squared_error(sar * gt_mask, gt))
-        # pred_rmse2 = np.sqrt(metrics.mean_squared_error(mask * gt_mask, gt))
-        # test += train_rmse2
-        # test2 += pred_rmse2
+        # all_train_eval += train_eval
+        # print('TRAIN_RMSE_' + fn + '：', train_eval)
+
+        # all_pred_eval += pred_eval
+        # print('PRED__RMSE_' + fn + '：', pred_eval)
 
         if train_rmse == 0 and pred_rmse == 0:
             zero_count += 1
 
         print(str(i+1) + '/' + str(len(in_files)))
-
-        # print(' leveling   ：', gt[gt.nonzero()])
-        # print(' Prediction ：', mask[gt.nonzero()])
-        # print(' StaMP&TRAI ：', sar[gt.nonzero()])
-        # print(' Input RMSE ：', np.sqrt(metrics.mean_squared_error(
-        #     sar[gt.nonzero()], gt[gt.nonzero()])))
-        # print(' Pred  RMSE ：', np.sqrt(metrics.mean_squared_error(
-        #     mask[gt.nonzero()], gt[gt.nonzero()])))
-
     # print('zero：',zero_count)
     divide_num = i+1-zero_count
     # print('divide num：',divide_num)
@@ -287,21 +298,25 @@ if __name__ == "__main__":
     # print('Pred  R2 score：', all_pred_eval[4] / (divide_num))
 
     # Test
-    print('TRAIN Variance score：', a / (divide_num))
-    print('Pred  Variance score：', a2 / (divide_num))
+    if divide_num:
+        print('TRAIN Variance score：', a / (divide_num))
+        print('Pred  Variance score：', a2 / (divide_num))
 
-    print('TRAIN MAE：', b / (divide_num))
-    print('Pred  MAE：', b2 / (divide_num))
+        print('TRAIN MAE：', b / (divide_num))
+        print('Pred  MAE：', b2 / (divide_num))
 
-    print('TRAIN MSE：', c / (divide_num))
-    print('Pred  MSE：', c2 / (divide_num))
+        print('TRAIN MSE：', c / (divide_num))
+        print('Pred  MSE：', c2 / (divide_num))
 
-    print('TRAIN RMSE：', d / (divide_num))
-    print('Pred  RMSE：', d2 / (divide_num))
+        print('TRAIN RMSE：', d / (divide_num))
+        print('Pred  RMSE：', d2 / (divide_num))
 
-    # print('TRAIN R2 score：', e / (divide_num))
-    # print('Pred  R2 score：', e2 / (divide_num))
+        print('TRAIN R2 score：', e / (divide_num))
+        print('Pred  R2 score：', e2 / (divide_num))
 
-    outfn = re.search('2020.*', args.model).group(0).split('/')[0]
-    with open('min_'+outfn+'.log', mode='w') as f:
-        f.write(str(d2 / (divide_num)))
+        if d / (divide_num) != test / (divide_num):
+            print('Validation Error')
+
+    # outfn = re.search('2020.*', args.model).group(0).split('/')[0]
+    # with open('min_'+outfn+'.log', mode='w') as f:
+    #     f.write(str(d2 / (divide_num)))

@@ -10,13 +10,14 @@ import torch.nn.functional as F
 
 from unet import UNet
 from utils import plot_img_and_mask
-from utils import resize_and_crop, normalize_sar, normalize_cor, hwc_to_chw, dense_crf
-from collections import OrderedDict # Use Old dataset
+from utils import resize_and_crop, hwc_to_chw, dense_crf
+from collections import OrderedDict  # 一時的
 import scipy.io as sio
 from sklearn import metrics
-import re
+import csv
 
 dir_test = '/home/shimosato/dataset/unet/test/'
+
 
 def predict_img(net,
                 sar,
@@ -104,7 +105,8 @@ def get_output_filenames(args):
             pathsplit = os.path.splitext(f)
             out_files.append("{}_OUT{}".format(pathsplit[0], pathsplit[1]))
     elif len(in_files) != len(args.output):
-        logging.error("Input files and output files are not of the same length")
+        logging.error(
+            "Input files and output files are not of the same length")
         raise SystemExit()
     else:
         out_files = args.output
@@ -115,10 +117,13 @@ def get_output_filenames(args):
 def mask_to_image(mask):
     return Image.fromarray((mask * 255).astype(np.uint8))
 
+
 def MinMaxScaler(sar):
     return (sar - torch.min(sar)) / (torch.max(sar) - torch.min(sar))
 
-# Use Old Dataset
+# 一時的
+
+
 def fix_model_state_dict(state_dict):
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
@@ -128,9 +133,11 @@ def fix_model_state_dict(state_dict):
         new_state_dict[name] = v
     return new_state_dict
 
+
 def get_ids(dir):
     """Returns a list of the ids in the directory"""
     return (os.path.splitext(f)[0] for f in os.listdir(dir) if not f.startswith('.'))
+
 
 if __name__ == "__main__":
     all_train_eval = []
@@ -146,7 +153,7 @@ if __name__ == "__main__":
     e = 0
     e2 = 0
     test = 0
-    test2 =0
+    test2 = 0
     args = get_args()
     args.input = list(get_ids(dir_test + 'sar/'))
     in_files = args.input
@@ -156,10 +163,11 @@ if __name__ == "__main__":
 
     logging.info("Loading model {}".format(args.model))
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu')
     logging.info(f'Using device {device}')
     net.to(device=device)
-    # Use Old dataset
+    # 一時的
+    # load it
     state_dict = torch.load(args.model, map_location=device)
     net.load_state_dict(fix_model_state_dict(state_dict))
     # net.load_state_dict(torch.load(args.model, map_location=device))
@@ -172,136 +180,40 @@ if __name__ == "__main__":
 
         # fn = os.path.splitext(fn)[0]
 
-        # Load npy file
         sar = np.load(dir_test + 'sar/' + fn + '.npy')
         sar_cor = np.load(dir_test + 'cor/' + fn + '_cor.npy')
 
-        # Normalize
-        sar_norm = normalize_sar(sar)
-        sar_cor_norm = normalize_cor(sar_cor)
+        # sar_in = np.expand_dims(sar, axis=2)
+        # sar_cor_in = np.expand_dims(sar_cor, axis=2)
 
-        # HWC to CHW
-        sar_in = hwc_to_chw(sar_norm)
-        sar_cor_in = hwc_to_chw(sar_cor_norm)
-
-        # sar = sio.loadmat(fn + '.mat')    # import matfile
-        # sar_cor = sio.loadmat(fn + '_cor.mat')    # import matfile
-        # sar = sar['data'].astype(np.float32)       # change type
-        # sar_cor = sar_cor['data'].astype(np.float32)       # change type
-
-        mask = predict_img(net=net,
-                           sar=sar_in,
-                           sar_cor=sar_cor_in,
-                           scale_factor=args.scale,
-                           out_threshold=args.mask_threshold,
-                           use_dense_crf=False,
-                           device=device)
-
-        if not args.no_save:
-            # out_fn = out_files[i]
-            # result = mask_to_image(mask)
-            # result.save(out_files[i] + '.jpg')
-
-            np.save(out_files[i], mask)
-            logging.info("Mask saved to {}".format(out_files[i]))
-
-        # if args.viz:
-        #     logging.info("Visualizing results for image {}, close to continue ...".format(fn))
-        #     plot_img_and_mask(img, mask)
+        sar_in = hwc_to_chw(sar)
+        sar_cor_in = hwc_to_chw(sar_cor)
 
         gt = np.load(dir_test + 'gt/' + fn + '_leveling.npy')
-        # gt = np.expand_dims(gt, axis=2)
-        # gt = hwc_to_chw(gt)
+
         gt_mask = np.where(gt != 0, 1, 0)  # mask
 
-
         train_mask = sar * gt_mask
-        pred_mask = mask * gt_mask
 
-        # Nonzero method
-        train_mask = sar[gt.nonzero()]
-        pred_mask = mask[gt.nonzero()]
-        gt = gt[gt.nonzero()]
-
-        train_vs = metrics.explained_variance_score(train_mask, gt)
-        train_mae = metrics.mean_absolute_error(train_mask, gt)
         train_mse = metrics.mean_squared_error(train_mask, gt)
-        train_rmse = np.sqrt(metrics.mean_squared_error(train_mask, gt))
-        # train_r2 = metrics.r2_score(train_mask, gt)
+        print(fn, '：', train_mse)
 
-        pred_vs = metrics.explained_variance_score(pred_mask, gt)
-        pred_mae = metrics.mean_absolute_error(pred_mask, gt)
-        pred_mse = metrics.mean_squared_error(pred_mask, gt)
-        pred_rmse = np.sqrt(metrics.mean_squared_error(pred_mask, gt))
-        # pred_r2 = metrics.r2_score(pred_mask, gt)
+        with open('test_mse.csv', 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow([fn, train_mse])
 
-        # train_eval = [train_vs,train_mae,train_mse,train_rmse,train_r2]
-        # pred_eval = [pred_vs,pred_mae,pred_mse,pred_rmse,pred_r2]
-        a += train_vs
-        b += train_mae
         c += train_mse
-        d += train_rmse
-        # e += train_r2
 
-        a2 += pred_vs
-        b2 += pred_mae
-        c2 += pred_mse
-        d2 += pred_rmse
-        # e2 += pred_r2
+        # all_train_eval += train_eval
+        # print('TRAIN_RMSE_' + fn + '：', train_eval)
 
+        # all_pred_eval += pred_eval
+        # print('PRED__RMSE_' + fn + '：', pred_eval)
 
-        # train_rmse2 = np.sqrt(metrics.mean_squared_error(sar * gt_mask, gt))
-        # pred_rmse2 = np.sqrt(metrics.mean_squared_error(mask * gt_mask, gt))
-        # test += train_rmse2
-        # test2 += pred_rmse2
-
-        if train_rmse == 0 and pred_rmse == 0:
+        if train_mse == 0:
             zero_count += 1
 
         print(str(i+1) + '/' + str(len(in_files)))
-
-        # print(' leveling   ：', gt[gt.nonzero()])
-        # print(' Prediction ：', mask[gt.nonzero()])
-        # print(' StaMP&TRAI ：', sar[gt.nonzero()])
-        # print(' Input RMSE ：', np.sqrt(metrics.mean_squared_error(
-        #     sar[gt.nonzero()], gt[gt.nonzero()])))
-        # print(' Pred  RMSE ：', np.sqrt(metrics.mean_squared_error(
-        #     mask[gt.nonzero()], gt[gt.nonzero()])))
-
-    # print('zero：',zero_count)
     divide_num = i+1-zero_count
-    # print('divide num：',divide_num)
-    # print('TRAIN Variance score：', all_train_eval[0] / (divide_num))
-    # print('Pred  Variance score：', all_pred_eval[0] / (divide_num))
 
-    # print('TRAIN MAE：', all_train_eval[1] / (divide_num))
-    # print('Pred  MAE：', all_pred_eval[1] / (divide_num))
-
-    # print('TRAIN MSE：', all_train_eval[2] / (divide_num))
-    # print('Pred  MSE：', all_pred_eval[2] / (divide_num))
-
-    # print('TRAIN RMSE：', all_train_eval[3] / (divide_num))
-    # print('Pred  RMSE：', all_pred_eval[3] / (divide_num))
-
-    # print('TRAIN R2 score：', all_train_eval[4] / (divide_num))
-    # print('Pred  R2 score：', all_pred_eval[4] / (divide_num))
-
-    # Test
-    print('TRAIN Variance score：', a / (divide_num))
-    print('Pred  Variance score：', a2 / (divide_num))
-
-    print('TRAIN MAE：', b / (divide_num))
-    print('Pred  MAE：', b2 / (divide_num))
-
-    print('TRAIN MSE：', c / (divide_num))
-    print('Pred  MSE：', c2 / (divide_num))
-
-    print('TRAIN RMSE：', d / (divide_num))
-    print('Pred  RMSE：', d2 / (divide_num))
-
-    # print('TRAIN R2 score：', e / (divide_num))
-    # print('Pred  R2 score：', e2 / (divide_num))
-
-    outfn = re.search('2020.*', args.model).group(0).split('/')[0]
-    with open('min_'+outfn+'.log', mode='w') as f:
-        f.write(str(d2 / (divide_num)))
+    print('INPUT MSE：', c / (divide_num))

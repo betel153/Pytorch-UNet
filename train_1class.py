@@ -71,9 +71,9 @@ def train_net(net,
                 gt = np.array([i[2] for i in b]).astype(np.float32)
                 gt_mask = np.where(gt != 0, 1, 0)  # mask
 
-                imgs_sar = torch.from_numpy(imgs_sar)
+                imgs = torch.from_numpy(imgs_sar)
                 imgs_cor = torch.from_numpy(imgs_cor)
-                imgs = torch.cat([imgs_sar, imgs_cor], dim=1)
+                # imgs = torch.cat([imgs_sar, imgs_cor], dim=1)
                 gt = torch.from_numpy(gt)
                 gt_mask = torch.from_numpy(gt_mask)
 
@@ -88,9 +88,7 @@ def train_net(net,
 
                 pred_def = net(imgs)
                 pred_def_mask = pred_def * gt_mask
-                gt_index = torch.nonzero(gt, as_tuple=True)
-                # loss = criterion(pred_def_mask, gt)
-                loss = criterion(pred_def[gt_index], gt[gt_index])
+                loss = criterion(pred_def_mask, gt)
                 epoch_loss += loss.item()
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
                 optimizer.zero_grad()
@@ -138,7 +136,7 @@ def get_args():
                         help='Learning rate', dest='lr')
     parser.add_argument('-f', '--load', dest='load', type=str, default=False,
                         help='Load model from a .pth file')
-    parser.add_argument('-s', '--scale', dest='scale', type=float, default=1,
+    parser.add_argument('-s', '--scale', dest='scale', type=float, default=0.5,
                         help='Downscaling factor of the images')
     parser.add_argument('-v', '--validation', dest='val', type=float, default=15.0,
                         help='Percent of the data that is used as validation (0-100)')
@@ -167,7 +165,7 @@ if __name__ == '__main__':
     #   - For 1 class and background, use n_classes=1
     #   - For 2 classes, use n_classes=1
     #   - For N > 2 classes, use n_classes=N
-    net = UNet(n_channels=2, n_classes=1)
+    net = UNet(n_channels=1, n_classes=1)
     logging.info(f'Network:\n'
                  f'\t{net.n_channels} input channels\n'
                  f'\t{net.n_classes} output channels (classes)\n'

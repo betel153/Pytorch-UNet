@@ -4,47 +4,27 @@ import numpy as np
 
 
 def hwc_to_chw(img):
-    img = np.expand_dims(img, axis=2)       # add axis
     return np.transpose(img, axes=[2, 0, 1])
 
-def normalize_sar(x):
-    if x.shape[0] == 512:
-        mean = 0.28402385
-        std = 9.549969
-    elif x.shape[0] == 2048:
-        mean = 0.12748308
-        std = 9.599052
-    else:
-        mean = 0.14989512
-        std = 9.466791
-    return (x - mean) / std
 
-def normalize_cor(x):
-    if x.shape[0] == 512:
-        mean = 0.002839577
-        std = 2.3237224
-    elif x.shape[0] == 2048:
-        mean = 0.001480923
-        std = 2.4691918
-    else:
-        mean = 0.045178086
-        std = 2.6548002
-    return (x - mean) / std
+def resize_and_crop(pilimg, scale=0.5, final_height=None):
+    # w = pilimg.size[0]
+    # h = pilimg.size[1]
+    # newW = int(w * scale)
+    # newH = int(h * scale)
 
-def resize_and_crop(img, scale=1, final_height=None):
-    if scale != 1:
-        w = img.shape[0]
-        h = img.shape[1]
-        newW = int(w * scale)
-        newH = int(h * scale)
+    # if not final_height:
+    #     diff = 0
+    # else:
+    #     diff = newH - final_height
 
-        reimg = np.empty((newW, newH)).astype(np.float32)
-        for i in range(newW):
-                for j in range(newW):
-                    reimg[i][j] = img[2*i+1][2*j+1]
-        return reimg
-    else:
-        return img
+    # img = pilimg.resize((newW, newH))
+    # img = img.crop((0, diff // 2, newW, newH - diff // 2))
+    ar = np.array(img, dtype=np.float32)
+    if len(ar.shape) == 2:
+        # for greyscale images, add a new axis
+        ar = np.expand_dims(ar, axis=2)
+    return ar
 
 def batch(iterable, batch_size):
     """Yields lists by batch"""
@@ -63,10 +43,13 @@ def split_train_val(dataset, val_percent=0.05):
     dataset = list(dataset)
     # length = len(dataset)
     # n = int(length * val_percent)
-    random.shuffle(dataset)
-    return {'train': dataset, 'val': []}
+    # random.shuffle(dataset)
     # return {'train': dataset[:-n], 'val': dataset[-n:]}
-    # return {'train': dataset[:-1], 'val': dataset[-1:]} % test mode
+    return {'train': dataset[:-1], 'val': dataset[-1:]}
+
+
+def normalize(x):
+    return x / 255
 
 
 # credits to https://stackoverflow.com/users/6076729/manuel-lagunas

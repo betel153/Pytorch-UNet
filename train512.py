@@ -16,10 +16,11 @@ from torch.utils.tensorboard import SummaryWriter
 import datetime
 dt_now = datetime.datetime.now()
 
-dir_sar = '/home/shimosato/dataset/unet/train/sar/'
-dir_cor = '/home/shimosato/dataset/unet/train/cor/'
-dir_gt = '/home/shimosato/dataset/unet/train/gt/'
+dir_sar = '/home/shimosato/dataset/unet/train2/sar/'
+dir_cor = '/home/shimosato/dataset/unet/train2/cor/'
+dir_gt = '/home/shimosato/dataset/unet/train2/gt/'
 dir_checkpoint = 'checkpoints/'
+
 
 def train_net(net,
               device,
@@ -33,7 +34,8 @@ def train_net(net,
 
     iddataset = split_train_val(ids, val_percent)
 
-    writer = SummaryWriter(comment=f'_Learning_rate_{lr}_Batch_size_{batch_size}')
+    writer = SummaryWriter(
+        comment=f'_Learning_rate_{lr}_Batch_size_{batch_size}')
 
     logging.info(f'''Starting training:
         Epochs:          {epochs}
@@ -59,8 +61,10 @@ def train_net(net,
         net.train()
 
         # reset the generators
-        train = get_imgs_and_masks(iddataset['train'], dir_sar, dir_cor, dir_gt, img_scale)
-        val = get_imgs_and_masks(iddataset['val'], dir_sar, dir_cor, dir_gt, img_scale)
+        train = get_imgs_and_masks(
+            iddataset['train'], dir_sar, dir_cor, dir_gt, img_scale)
+        val = get_imgs_and_masks(
+            iddataset['val'], dir_sar, dir_cor, dir_gt, img_scale)
 
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
             epoch_loss = 0
@@ -88,19 +92,17 @@ def train_net(net,
 
                 pred_def = net(imgs)
                 pred_def_mask = pred_def * gt_mask
-                gt_index = torch.nonzero(gt, as_tuple=True)
-                # loss = criterion(pred_def_mask, gt)
-                loss = criterion(pred_def[gt_index], gt[gt_index])
+                loss = criterion(pred_def_mask, gt)
                 epoch_loss += loss.item()
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
+
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
                 pbar.update(batch_size)
-            logging.info('Train Loss: {}'.format(epoch_loss))
-            writer.add_scalar('Loss/Train', epoch_loss / len(iddataset["train"]), epoch+1)
-
+            writer.add_scalar('Loss/Train', epoch_loss /
+                              len(iddataset["train"]), epoch+1)
 
         # val_score = eval_net(net, val, device, n_val)
         # if net.module.n_classes > 1:
@@ -112,20 +114,23 @@ def train_net(net,
 
         if save_cp:
             try:
-                data_lr_Bs = dt_now.strftime('%Y%m%d%H%M')+'_Lr_'+str(lr)+'_Bs_'+str(batch_size)+'/'
+                data_lr_Bs = dt_now.strftime(
+                    '%Y%m%d%H%M')+'_Lr_'+str(lr)+'_Bs_'+str(batch_size)+'/'
                 os.mkdir(dir_checkpoint + data_lr_Bs)
                 logging.info('Created checkpoint directory')
             except OSError:
                 pass
             # torch.save(net.state_dict(), dir_checkpoint + data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
-            if loss_min >= epoch_loss:
-                torch.save(net.module.state_dict(), dir_checkpoint + data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
+            if loss_min >= loss.item():
+                torch.save(net.module.state_dict(), dir_checkpoint +
+                           data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
                 logging.info(f'Checkpoint {epoch + 1} saved !')
-                loss_min = epoch_loss
+                loss_min = loss.item()
             else:
                 logging.info(f'Skip Checkpoint {epoch + 1} !')
     # print('Input MSE_Loss:',epoch_loss_input)
     writer.close()
+
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
@@ -138,7 +143,7 @@ def get_args():
                         help='Learning rate', dest='lr')
     parser.add_argument('-f', '--load', dest='load', type=str, default=False,
                         help='Load model from a .pth file')
-    parser.add_argument('-s', '--scale', dest='scale', type=float, default=1,
+    parser.add_argument('-s', '--scale', dest='scale', type=float, default=0.5,
                         help='Downscaling factor of the images')
     parser.add_argument('-v', '--validation', dest='val', type=float, default=15.0,
                         help='Percent of the data that is used as validation (0-100)')
@@ -155,7 +160,8 @@ def pretrain_checks():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    logging.basicConfig(level=logging.INFO,
+                        format='%(levelname)s: %(message)s')
     args = get_args()
     pretrain_checks()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

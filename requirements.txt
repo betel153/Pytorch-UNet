@@ -4,3 +4,6 @@ numpy
 Pillow
 torch
 torchvision
+tqdm
+tensorflow
+tensorboardx
