@@ -7,16 +7,17 @@ import h5py
 dt_now = datetime.datetime.now()
 
 base_dir = '/home/shimosato/dataset/unet/'
-# crop_size = (1024, 1024)
-crop_size = (2048, 2048)
+crop_size = (1024, 1024)
+#crop_size = (2048, 2048)
 
 # input folder
 input_dir = base_dir + 'datafolder/'
+# input_dir = base_dir + 'test/raw/'
 
 # output folder
-sar_out_dir = base_dir + 'train2048/sar/'
-cor_out_dir = base_dir + 'train2048/cor/'
-gt_out_dir = base_dir + 'train2048/gt/'
+sar_out_dir = base_dir + 'train/sar/'
+cor_out_dir = base_dir + 'train/cor/'
+gt_out_dir = base_dir + 'train/gt/'
 
 # sar_out_dir = base_dir + 'test/sar/'
 # cor_out_dir = base_dir + 'test/cor/'
@@ -52,26 +53,60 @@ for id in ids:
 
     h, w = sar.shape
 
+    print('　Creating ...')
     for i, center in enumerate(xy):
         sar_output = []
         c_h, c_w = center  # GT's center
         # decide top and left
-        top = c_h - crop_size[0] // 2
-        left = c_w - crop_size[1] // 2
+        top = c_h - np.random.randint(0, crop_size[0] // 2)
+        left = c_w - np.random.randint(0, crop_size[1] // 2)
         # decide bottom and right
         bottom = top + crop_size[0]
         right = left + crop_size[1]
 
-        if right > w:
-            left -= right - w
-            left -= np.random.randint(0, left)
-            right = left + crop_size[1]
-        if bottom > h:
-            top -= right - h
-            top -= np.random.randint(0, top)
-            bottom = top + crop_size[1]
+        count = 0
+        while True:
+            if left < 0:
+                left =  - left
+                left += np.random.randint(0, w - right)
+                right = left + crop_size[1]
+            if right > w:
+                left -= right - w
+                left -= np.random.randint(0, left)
+                right = left + crop_size[1]
+            if top < 0:
+                top = - top
+                top += np.random.randint(0, h - bottom)
+                bottom = top + crop_size[1]
+            if bottom > h:
+                top -= right - h
+                top -= np.random.randint(0, top)
+                bottom = top + crop_size[1]
+            if c_h < top or c_h > bottom or c_w < left or c_w > right:
+                top = c_h - np.random.randint(crop_size[0] // 4, crop_size[0] // 2)
+                left = c_w - np.random.randint(crop_size[1] // 4, crop_size[1] // 2)
+                # decide bottom and right
+                bottom = top + crop_size[0]
+                right = left + crop_size[1]
+            if left >= 0 and right <= w and top >= 0 and bottom <= h and c_h >= top and c_h <= bottom and c_w >= left and c_w <= right:
+                # print('Save now: ', id + '_' + str(i))
+                gt_test = np.zeros(gt.shape)
+                gt_test[c_h-1, c_w-1] = gt[c_h-1, c_w-1]
+                np.save(sar_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M'), sar[top:bottom, left:right])
+                np.save(cor_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_cor', cor[top:bottom, left:right])
+                np.save(gt_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_leveling', gt[top:bottom, left:right])
+                # np.save(gt_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_leveling', gt_test[top:bottom, left:right])
+                break
+            if count > 20:
+                print('Error: ', id + '_' + str(i))
+                break
+            count += 1
         # print('top:',top,'left:',left,'bottom:',bottom,'right:',right)
 
-        np.save(sar_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M'), sar[top:bottom, left:right])
-        np.save(cor_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_cor', cor[top:bottom, left:right])
-        np.save(gt_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_leveling', gt[top:bottom, left:right])
+        # gt_test = np.zeros(gt.shape)
+        # gt_test[c_h-1, c_w-1] = gt[c_h-1, c_w-1]
+
+        # np.save(sar_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M'), sar[top:bottom, left:right])
+        # np.save(cor_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_cor', cor[top:bottom, left:right])
+        # np.save(gt_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_leveling', gt[top:bottom, left:right])
+        # np.save(gt_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_leveling', gt_test[top:bottom, left:right])

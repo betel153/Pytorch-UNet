@@ -1,11 +1,11 @@
 import numpy as np
+import torch
+import torch.nn as nn
+from torch import optim
 
-a = np.zeros([2, 1, 3, 3])
-a[0, 0, 1, 1] = 1
-a[1, 0, 2, 2] = 1
-print(a)
-b = np.nonzero(a)
-print(b)
-c = np.transpose(b)
-print(a[b])
-test=0
+x = torch.randn(1, 1, 2, 3)
+y = torch.randn(1, 1, 2, 3)
+z = torch.randn(1, 1, 2, 3)
+
+cat = torch.cat([x, y, z], dim=1)
+test=1

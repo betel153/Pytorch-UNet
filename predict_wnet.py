@@ -8,7 +8,7 @@ from PIL import Image
 from torchvision import transforms
 import torch.nn.functional as F
 
-from unet import UNet
+from unet import UNet_wnet
 from utils import plot_img_and_mask
 from utils import resize_and_crop, normalize_sar, normalize_cor, hwc_to_chw, dense_crf
 from collections import OrderedDict # Use Old dataset
@@ -35,11 +35,14 @@ def predict_img(net,
 
     sar_torch = torch.from_numpy(sar).unsqueeze(0)
     sar_cor_torch = torch.from_numpy(sar_cor).unsqueeze(0)
-    X = torch.cat([sar_torch, sar_cor_torch], dim=1)
-    X = X.to(device=device)
+    # X = torch.cat([sar_torch, sar_cor_torch], dim=1)
+    # X = X.to(device=device)
+
+    sar_torch = sar_torch.to(device=device)
+    sar_cor_torch = sar_cor_torch.to(device=device)
 
     with torch.no_grad():
-        probs = net(X)
+        probs = net(sar_torch, sar_cor_torch)
 
         # if net.n_classes > 1:
         #     probs = F.softmax(output, dim=1)
@@ -154,7 +157,7 @@ if __name__ == "__main__":
     in_files = args.input
     out_files = get_output_filenames(args)
 
-    net = UNet(n_channels=2, n_classes=1)
+    net = UNet_wnet(n_channels=1, n_classes=1)
 
     logging.info("Loading model {}".format(args.model))
 
@@ -318,9 +321,9 @@ if __name__ == "__main__":
     # print('TRAIN R2 score：', e / (divide_num))
     # print('Pred  R2 score：', e2 / (divide_num))
 
-    # outfn = re.search('2020.*', args.model).group(0).split('/')[0]
-    # with open('min_'+outfn+'.log', mode='w') as f:
-    #     f.write(str(d2 / (divide_num)))
+    outfn = re.search('2020.*', args.model).group(0).split('/')[0]
+    with open('min_'+outfn+'.log', mode='w') as f:
+        f.write(str(d2 / (divide_num)))
 
     # np.save('train_ar.npy', train_ar)
     # np.save('pred_ar.npy', pred_ar)

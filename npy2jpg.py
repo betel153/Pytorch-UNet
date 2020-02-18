@@ -9,6 +9,7 @@ from unet import UNet
 from utils import plot_img_and_mask
 import scipy.io as sio
 import h5py
+import matplotlib.pyplot as plt
 
 def get_args():
     parser = argparse.ArgumentParser(description='Predict masks from input images',
@@ -59,17 +60,20 @@ if __name__ == "__main__":
         # img = Image.open(fn)
 
         # NPY file
-        # sar = np.load(fn + '.npy')
+        sar = np.load(fn + '.npy')
 
         # MAT file
-        with h5py.File(fn + '.mat', 'r') as f:
-            sar = np.transpose(f['data'][()].astype(np.float32), axes=[1, 0])
+        # with h5py.File(fn + '.mat', 'r') as f:
+        #     sar = np.transpose(f['data'][()].astype(np.float32), axes=[1, 0])
 
         # sar = MinMaxScaler(sar)
         sar = sigmoid(sar)
 
         out_fn = out_files[i]
         result = mask_to_image(sar)
-        result.save(out_files[i] + '.jpg')
+        plt.imshow((sar * 255).astype(np.uint8), "gray")  # グレースケールで
+        plt.colorbar()  # カラーバーの表示
+        plt.show()
+        # result.save(out_files[i] + '.jpg')
 
         logging.info("Mask saved to {}".format(out_files[i]))

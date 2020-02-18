@@ -10,7 +10,7 @@ from torch import optim
 from tqdm import tqdm
 
 from eval import eval_net
-from unet import UNet
+from unet import UNet_wnet
 from utils import get_ids, split_train_val, get_imgs_and_masks, batch
 from torch.utils.tensorboard import SummaryWriter
 import datetime
@@ -73,12 +73,11 @@ def train_net(net,
 
                 imgs_sar = torch.from_numpy(imgs_sar)
                 imgs_cor = torch.from_numpy(imgs_cor)
-                imgs = torch.cat([imgs_sar, imgs_cor], dim=1)
                 gt = torch.from_numpy(gt)
                 gt_mask = torch.from_numpy(gt_mask)
 
-                imgs = imgs.to(device=device)
-                # imgs_sar = imgs_sar.to(device=device)
+                imgs_sar = imgs_sar.to(device=device)
+                imgs_cor = imgs_cor.to(device=device)
                 gt = gt.to(device=device)
                 gt_mask = gt_mask.to(device=device)
 
@@ -86,7 +85,7 @@ def train_net(net,
                 # loss_input = criterion(imgs_sar * gt_mask, gt)
                 # epoch_loss_input += loss_input.item()
 
-                pred_def = net(imgs)
+                pred_def = net(imgs_sar, imgs_cor)
                 pred_def_mask = pred_def * gt_mask
                 gt_index = torch.nonzero(gt, as_tuple=True)
                 # loss = criterion(pred_def_mask, gt)
@@ -167,7 +166,7 @@ if __name__ == '__main__':
     #   - For 1 class and background, use n_classes=1
     #   - For 2 classes, use n_classes=1
     #   - For N > 2 classes, use n_classes=N
-    net = UNet(n_channels=2, n_classes=1)
+    net = UNet_wnet(n_channels=1, n_classes=1)
     logging.info(f'Network:\n'
                  f'\t{net.n_channels} input channels\n'
                  f'\t{net.n_classes} output channels (classes)\n'
