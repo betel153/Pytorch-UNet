@@ -13,7 +13,6 @@ def get_ids(dir):
     """Returns a list of the ids in the directory"""
     return (os.path.splitext(f)[0] for f in os.listdir(dir) if not f.startswith('.'))
 
-
 def to_cropped_imgs(ids, dir, suffix, scale):
     """From a list of tuples, returns the correct cropped img"""
     for id in ids:

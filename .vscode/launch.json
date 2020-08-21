@@ -14,19 +14,19 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "--epochs",
-                "200",
-                "--batch-size",
-                "1",
-                "--learning-rate",
-                "5e-05",
+                // "--epochs",
+                // "200",
+                // "--batch-size",
+                // "2",
+                // "--learning-rate",
+                // "1e-05",
                 // "--scale",
                 // "0.5",
-                // "--input",
-                // "ibaraki2016IW2_concat.npy",
-                // "--no-save",
-                // "--model",
-                // "checkpoints/202001141609_Lr_5e-05_Bs_12/CP_epoch21.pth",
+                "--input",
+                "sample.npy",
+                "--no-save"
+                "--model",
+                "checkpoints/202004232245_Lr_1e-05_Bs_8/CP_epoch21.pth",
             ]
         }
     ]

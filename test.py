@@ -1,11 +1,13 @@
-import numpy as np
-import torch
-import torch.nn as nn
-from torch import optim
+import matplotlib.pyplot as plt
 
-x = torch.randn(1, 1, 2, 3)
-y = torch.randn(1, 1, 2, 3)
-z = torch.randn(1, 1, 2, 3)
+x = [30, 36, 40, 44, 50, 58, 60, 61, 63, 65, 66, 68, 72, 75, 75, 78, 70, 80, 84, 90, 93,
+      32, 39, 41, 42, 51, 53, 61, 64, 66, 67, 68, 69, 73, 74, 78, 79, 80, 81, 90, 22, 84,]
 
-cat = torch.cat([x, y, z], dim=1)
-test=1
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+
+ax.hist(x, bins=10)
+ax.set_title('test histogram')
+ax.set_xlabel('Score')
+ax.set_ylabel('Num of Poeple')
+fig.show()

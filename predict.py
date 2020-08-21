@@ -37,6 +37,7 @@ def predict_img(net,
     sar_cor_torch = torch.from_numpy(sar_cor).unsqueeze(0)
     X = torch.cat([sar_torch, sar_cor_torch], dim=1)
     X = X.to(device=device)
+    sar_torch = sar_torch.to(device=device)
 
     with torch.no_grad():
         probs = net(X)
@@ -217,14 +218,21 @@ if __name__ == "__main__":
         # gt = hwc_to_chw(gt)
         gt_mask = np.where(gt != 0, 1, 0)  # mask
 
+        gt_index = gt.nonzero()  # GT mask
+        sar = sar[gt_index]
+        sar_nonzero = sar.nonzero()
 
-        train_mask = sar * gt_mask
-        pred_mask = mask * gt_mask
+        # train_mask = sar * gt_mask
+        # pred_mask = mask * gt_mask
 
         # Nonzero method
-        train_mask = sar[gt.nonzero()]
-        pred_mask = mask[gt.nonzero()]
-        gt = gt[gt.nonzero()]
+        # train_mask = sar[gt.nonzero()]
+        # pred_mask = mask[gt.nonzero()]
+        # gt = gt[gt.nonzero()]
+
+        train_mask = sar[sar_nonzero]
+        pred_mask = mask[gt_index][sar_nonzero]
+        gt = gt[gt_index][sar_nonzero]
 
         print('TRAIN score:', train_mask)
         print('Pred  score:', pred_mask)
@@ -318,9 +326,9 @@ if __name__ == "__main__":
     # print('TRAIN R2 score：', e / (divide_num))
     # print('Pred  R2 score：', e2 / (divide_num))
 
-    # outfn = re.search('2020.*', args.model).group(0).split('/')[0]
-    # with open('min_'+outfn+'.log', mode='w') as f:
-    #     f.write(str(d2 / (divide_num)))
+    outfn = re.search('2020.*', args.model).group(0).split('/')[0]
+    with open('min_'+outfn+'.log', mode='w') as f:
+        f.write(str(d2 / (divide_num)))
 
     # np.save('train_ar.npy', train_ar)
     # np.save('pred_ar.npy', pred_ar)

@@ -78,19 +78,21 @@ def train_net(net,
                 gt_mask = torch.from_numpy(gt_mask)
 
                 imgs = imgs.to(device=device)
-                # imgs_sar = imgs_sar.to(device=device)
+                imgs_sar = imgs_sar.to(device=device)
                 gt = gt.to(device=device)
                 gt_mask = gt_mask.to(device=device)
 
-                # Check input mse_loss
-                # loss_input = criterion(imgs_sar * gt_mask, gt)
-                # epoch_loss_input += loss_input.item()
+                gt_index = torch.nonzero(gt, as_tuple=True) # GT mask
+                imgs_sar = imgs_sar[gt_index]
+                sar_nonzero = torch.nonzero(imgs_sar, as_tuple=True)
 
                 pred_def = net(imgs)
-                pred_def_mask = pred_def * gt_mask
-                gt_index = torch.nonzero(gt, as_tuple=True)
-                # loss = criterion(pred_def_mask, gt)
-                loss = criterion(pred_def[gt_index], gt[gt_index])
+                # pred_def_mask = pred_def * gt_mask
+
+                if not len(imgs_sar[sar_nonzero]):
+                    continue
+
+                loss = criterion(pred_def[gt_index][sar_nonzero], gt[gt_index][sar_nonzero])
                 epoch_loss += loss.item()
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
                 optimizer.zero_grad()

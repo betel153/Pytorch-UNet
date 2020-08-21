@@ -8,28 +8,34 @@ def hwc_to_chw(img):
     return np.transpose(img, axes=[2, 0, 1])
 
 def normalize_sar(x):
-    if x.shape[0] == 512:
-        mean = 0.28402385
-        std = 9.549969
-    elif x.shape[0] == 2048:
-        mean = 0.12748308
-        std = 9.599052
-    else:
-        mean = 0.14989512
-        std = 9.466791
+    # if x.shape[0] == 512:
+    #     mean = 0.28402385
+    #     std = 9.549969
+    # elif x.shape[0] == 2048:
+    #     mean = 0.12748308
+    #     std = 9.599052
+    # else:
+    #     mean = 0.14989512
+    #     std = 9.466791
+    mean = 0.16424856
+    std = 7.7834034
     return (x - mean) / std
+    # return x # stop normalize
 
 def normalize_cor(x):
-    if x.shape[0] == 512:
-        mean = 0.002839577
-        std = 2.3237224
-    elif x.shape[0] == 2048:
-        mean = 0.001480923
-        std = 2.4691918
-    else:
-        mean = 0.045178086
-        std = 2.6548002
+    # if x.shape[0] == 512:
+    #     mean = 0.002839577
+    #     std = 2.3237224
+    # elif x.shape[0] == 2048:
+    #     mean = 0.001480923
+    #     std = 2.4691918
+    # else:
+    #     mean = 0.045178086
+    #     std = 2.6548002
+    mean = 0.01181804
+    std = 1.5279412
     return (x - mean) / std
+    # return x
 
 def resize_and_crop(img, scale=1, final_height=None):
     if scale != 1:

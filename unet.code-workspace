@@ -10,5 +10,7 @@
 			"path": "/home/shimosato/snap2stamps"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.pythonPath": "/home/shimosato/.pyenv/versions/env/bin/python"
+	}
 }
