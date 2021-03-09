@@ -29,6 +29,11 @@ def get_imgs_and_masks(ids, dir_img, dir_cor, dir_gt, scale):
 
     # need to transform from HWC to CHW
     imgs_normalized = map(normalize_sar, imgs)
+    #
+    # 平均化処理を入れるならこの行．corは無しでも問題ないか．
+    # https://qiita.com/secang0/items/f3a3ff629988dc660d87
+    # ↑が参考になるか
+    #
     imgs_switched = map(hwc_to_chw, imgs_normalized)
 
     imgs_cor_normalized = map(normalize_cor, imgs_cor)

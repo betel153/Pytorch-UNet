@@ -16,7 +16,8 @@ import scipy.io as sio
 from sklearn import metrics
 import re
 
-dir_test = '/home/shimosato/dataset/unet/train_visual/'
+# dir_test = '/home/shimosato/dataset/unet/train_visual/'
+dir_test = '/home/shimosato/dataset/unet/test/'
 # dir_test = '/home/shimosato/dataset/unet/tokyo_leveling/'
 
 def predict_img(net,
@@ -161,8 +162,8 @@ if __name__ == "__main__":
 
     logging.info("Loading model {}".format(args.model))
 
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = torch.device('cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cpu')
     logging.info(f'Using device {device}')
     net.to(device=device)
     # Use Old dataset
@@ -173,8 +174,8 @@ if __name__ == "__main__":
     logging.info("Model loaded !")
 
     zero_count = 0
+    leveling_ave = 0
     for i, fn in enumerate(in_files):
-        fn = "ibaraki2017IW2_10_202008202107"
         logging.info("\nPredicting image {} ...".format(fn))
         print('FileName:', fn)
 
@@ -230,6 +231,7 @@ if __name__ == "__main__":
         train_mask = sar[gt.nonzero()]
         pred_mask = mask[gt.nonzero()]
         gt = gt[gt.nonzero()]
+        leveling_ave += gt.shape[0]
 
         print('TRAIN score:', train_mask)
         print('Pred  score:', pred_mask)
@@ -243,6 +245,10 @@ if __name__ == "__main__":
             train_ar = np.append(train_ar, train_mask)
             pred_ar = np.append(pred_ar, pred_mask)
             gt_ar = np.append(gt_ar, gt)
+
+        if not train_mask.any():
+            zero_count += 1
+            continue
 
         train_vs = metrics.explained_variance_score(train_mask, gt)
         train_mae = metrics.mean_absolute_error(train_mask, gt)
@@ -319,6 +325,8 @@ if __name__ == "__main__":
 
     print('TRAIN RMSE：', d / (divide_num))
     print('Pred  RMSE：', d2 / (divide_num))
+
+    print('Leveling Average：', leveling_ave / (divide_num))
 
     # print('TRAIN R2 score：', e / (divide_num))
     # print('Pred  R2 score：', e2 / (divide_num))

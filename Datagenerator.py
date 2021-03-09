@@ -6,18 +6,21 @@ import h5py
 
 dt_now = datetime.datetime.now()
 
-base_dir = '/home/shimosato/dataset/unet/'
-# crop_size = (1024, 1024)
-crop_size = (4096, 4096)
+base_dir = '/home/shimosato/dl001/shimosato/dataset/unet/'
+crop_size = (1024, 1024)
+# crop_size = (4096, 4096)
 
 # input folder
-# input_dir = base_dir + 'datafolder/'
-input_dir = base_dir + 'test/raw/'
+input_dir = base_dir + 'datafolder/'
+# input_dir = base_dir + 'test/raw/'
 
 # output folder
-sar_out_dir = base_dir + 'train_visual_4096/sar/'
-cor_out_dir = base_dir + 'train_visual_4096/cor/'
-gt_out_dir = base_dir + 'train_visual_4096/gt/'
+sar_out_dir = base_dir + 'data_num/x6/sar/'
+cor_out_dir = base_dir + 'data_num/x6/cor/'
+gt_out_dir = base_dir + 'data_num/x6/gt/'
+# sar_out_dir = base_dir + 'train_visual_4096/sar/'
+# cor_out_dir = base_dir + 'train_visual_4096/cor/'
+# gt_out_dir = base_dir + 'train_visual_4096/gt/'
 
 # sar_out_dir = base_dir + 'test/sar/'
 # cor_out_dir = base_dir + 'test/cor/'
@@ -93,7 +96,7 @@ for id in ids:
                 top += np.random.randint(0, h - bottom)
                 bottom = top + crop_size[1]
             if bottom > h:
-                top -= right - h
+                top -= bottom - h
                 top -= np.random.randint(0, top)
                 bottom = top + crop_size[1]
             if c_h < top or c_h > bottom or c_w < left or c_w > right:
@@ -104,8 +107,6 @@ for id in ids:
                 right = left + crop_size[1]
             if left >= 0 and right <= w and top >= 0 and bottom <= h and c_h >= top and c_h <= bottom and c_w >= left and c_w <= right:
                 # print('Save now: ', id + '_' + str(i))
-                gt_test = np.zeros(gt.shape)
-                gt_test[c_h, c_w] = gt[c_h, c_w]
                 np.save(sar_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M'), sar[top:bottom, left:right])
                 np.save(cor_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_cor', cor[top:bottom, left:right])
                 np.save(gt_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_leveling', gt[top:bottom, left:right])

@@ -1,13 +1,25 @@
+import numpy as np
 import matplotlib.pyplot as plt
 
-x = [30, 36, 40, 44, 50, 58, 60, 61, 63, 65, 66, 68, 72, 75, 75, 78, 70, 80, 84, 90, 93,
-      32, 39, 41, 42, 51, 53, 61, 64, 66, 67, 68, 69, 73, 74, 78, 79, 80, 81, 90, 22, 84,]
+def f(x, y, mu, S):
+  x_norm = (np.array([x, y]) - mu[:, None, None]).transpose(1, 2, 0)
+  return np.exp(- x_norm[:, :, None, :] @ np.linalg.inv(S)[None, None, :, :] @ x_norm[:, :, :, None] / 2.0) / (2*np.pi*np.sqrt(np.linalg.det(S)))
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
+x = y = np.arange(-20, 20, 0.5)
+X, Y = np.meshgrid(x, y)
 
-ax.hist(x, bins=10)
-ax.set_title('test histogram')
-ax.set_xlabel('Score')
-ax.set_ylabel('Num of Poeple')
-fig.show()
+mu = np.array([0,0])
+S = np.array([[20,0],[0,20]])
+
+Z = f(X,Y, mu, S)[:, :, 0, 0]
+
+fig1 = plt.figure()
+ax1 = plt.subplot(111, projection='3d')
+ax1.plot_surface(X,Y,Z, antialiased=False, cmap="plasma")
+
+fig2 = plt.figure()
+ax2 = plt.subplot(111)
+cs = ax2.contourf(X,Y,Z,100, cmap="plasma")
+plt.colorbar(cs)
+
+plt.show()
