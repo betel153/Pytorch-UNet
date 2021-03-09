@@ -4,9 +4,9 @@ import os
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
-import torch.nn.functional as F
 
 from unet import UNet
 from utils import plot_img_and_mask
@@ -24,8 +24,7 @@ def predict_img(net,
                 sar_cor,
                 device,
                 scale_factor=1,
-                out_threshold=0.5,
-                use_dense_crf=False):
+                out_threshold=0.5):
     net.eval()
     # sar_height = sar.shape[1]
 
@@ -198,7 +197,6 @@ if __name__ == "__main__":
                            sar_cor=sar_cor_in,
                            scale_factor=args.scale,
                            out_threshold=args.mask_threshold,
-                           use_dense_crf=False,
                            device=device)
 
         if not args.no_save:

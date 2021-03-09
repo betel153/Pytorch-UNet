@@ -25,13 +25,21 @@ def train_net(net,
               device,
               epochs=5,
               batch_size=1,
-              lr=0.1,
-              val_percent=0.15,
+              lr=0.001,
+              val_percent=0.1,
               save_cp=True,
               img_scale=1):
     ids = get_ids(dir_sar)
 
-    iddataset = split_train_val(ids, val_percent)
+    dataset = BasicDataset(dir_img, dir_mask, img_scale)
+    n_val = int(len(dataset) * val_percent)
+    n_train = len(dataset) - n_val
+    train, val = random_split(dataset, [n_train, n_val])
+    train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
+    val_loader = DataLoader(val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
+
+    writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
+    global_step = 0
 
     writer = SummaryWriter(comment=f'_Learning_rate_{lr}_Batch_size_{batch_size}')
 
@@ -39,8 +47,8 @@ def train_net(net,
         Epochs:          {epochs}
         Batch size:      {batch_size}
         Learning rate:   {lr}
-        Training size:   {len(iddataset["train"])}
-        Validation size: {len(iddataset["val"])}
+        Training size:   {n_train}
+        Validation size: {n_val}
         Checkpoints:     {save_cp}
         Device:          {device.type}
     ''')
@@ -97,6 +105,7 @@ def train_net(net,
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
                 optimizer.zero_grad()
                 loss.backward()
+                nn.utils.clip_grad_value_(net.parameters(), 0.1)
                 optimizer.step()
 
                 pbar.update(batch_size)
@@ -136,13 +145,13 @@ def get_args():
                         help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?', default=1,
                         help='Batch size', dest='batchsize')
-    parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?', default=0.1,
+    parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?', default=0.0001,
                         help='Learning rate', dest='lr')
     parser.add_argument('-f', '--load', dest='load', type=str, default=False,
                         help='Load model from a .pth file')
     parser.add_argument('-s', '--scale', dest='scale', type=float, default=1,
                         help='Downscaling factor of the images')
-    parser.add_argument('-v', '--validation', dest='val', type=float, default=15.0,
+    parser.add_argument('-v', '--validation', dest='val', type=float, default=10.0,
                         help='Percent of the data that is used as validation (0-100)')
 
     return parser.parse_args()
@@ -159,7 +168,6 @@ def pretrain_checks():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = get_args()
-    pretrain_checks()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
 
@@ -173,7 +181,7 @@ if __name__ == '__main__':
     logging.info(f'Network:\n'
                  f'\t{net.n_channels} input channels\n'
                  f'\t{net.n_classes} output channels (classes)\n'
-                 f'\t{"Bilinear" if net.bilinear else "Dilated conv"} upscaling')
+                 f'\t{"Bilinear" if net.bilinear else "Transposed conv"} upscaling')
 
     if args.load:
         net.load_state_dict(
@@ -188,18 +196,18 @@ if __name__ == '__main__':
     # faster convolutions, but more memory
     torch.backends.cudnn.benchmark = True
 
-try:
-    train_net(net=net,
-              epochs=args.epochs,
-              batch_size=args.batchsize,
-              lr=args.lr,
-              device=device,
-              img_scale=args.scale,
-              val_percent=args.val / 100)
-except KeyboardInterrupt:
-    torch.save(net.state_dict(), 'INTERRUPTED.pth')
-    logging.info('Saved interrupt')
     try:
-        sys.exit(0)
-    except SystemExit:
-        os._exit(0)
+        train_net(net=net,
+                  epochs=args.epochs,
+                  batch_size=args.batchsize,
+                  lr=args.lr,
+                  device=device,
+                  img_scale=args.scale,
+                  val_percent=args.val / 100)
+    except KeyboardInterrupt:
+        torch.save(net.state_dict(), 'INTERRUPTED.pth')
+        logging.info('Saved interrupt')
+        try:
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)

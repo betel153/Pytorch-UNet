@@ -9,9 +9,11 @@ import re
 from dice_loss import dice_coeff
 
 
-def eval_net(net, dataset, device, n_val):
+def eval_net(net, loader, device):
     """Evaluation without the densecrf with the dice coefficient"""
     net.eval()
+    mask_type = torch.float32 if net.n_classes == 1 else torch.long
+    n_val = len(loader)  # the number of batch
     tot = 0
 
     for i, b in tqdm(enumerate(dataset), total=n_val, desc='Validation round', unit='img'):
@@ -40,6 +42,7 @@ def eval_net(net, dataset, device, n_val):
         else:
             tot += F.mse_loss(pred_def_mask, gt.squeeze(dim=1)).item()
 
+    net.train()
     return tot / n_val
 
 def eval_net_test(net, dataset, device, n_val):
