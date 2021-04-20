@@ -6,12 +6,13 @@ import numpy as np
 from PIL import Image
 
 from .utils import resize_and_crop, normalize_sar, normalize_cor, hwc_to_chw
-import scipy.io as sio
+from scipy import ndimage
 
 
 def get_ids(dir):
     """Returns a list of the ids in the directory"""
     return (os.path.splitext(f)[0] for f in os.listdir(dir) if not f.startswith('.'))
+
 
 def to_cropped_imgs(ids, dir, suffix, scale):
     """From a list of tuples, returns the correct cropped img"""
@@ -22,18 +23,28 @@ def to_cropped_imgs(ids, dir, suffix, scale):
         im = resize_and_crop(np.load(dir + id + suffix), scale)    # import
         yield im
 
+
+def to_cropped_imgs_sar(ids, dir, suffix, scale):
+    """From a list of tuples, returns the correct cropped img"""
+    for id in ids:
+        # im = resize_and_crop(Image.open(dir + id + suffix), scale=scale) # original
+
+        # MATLAB file
+        im = resize_and_crop(np.load(dir + id + suffix), scale)    # import
+        im = ndimage.filters.gaussian_filter(im, 0.1)  # gaussian_filter
+        yield im
+
+
 def get_imgs_and_masks(ids, dir_img, dir_cor, dir_gt, scale):
     """Return all the couples (img, mask)"""
-    imgs = to_cropped_imgs(ids, dir_img, '.npy', scale) # change jpg to mat
-    imgs_cor = to_cropped_imgs(ids, dir_cor, '_cor.npy', scale) # change jpg to mat
+    imgs = to_cropped_imgs_sar(
+        ids, dir_img, '.npy', scale)  # change jpg to mat
+    imgs_cor = to_cropped_imgs(
+        ids, dir_cor, '_cor.npy', scale)  # change jpg to mat
 
     # need to transform from HWC to CHW
     imgs_normalized = map(normalize_sar, imgs)
-    #
-    # 平均化処理を入れるならこの行．corは無しでも問題ないか．
-    # https://qiita.com/secang0/items/f3a3ff629988dc660d87
-    # ↑が参考になるか
-    #
+
     imgs_switched = map(hwc_to_chw, imgs_normalized)
 
     imgs_cor_normalized = map(normalize_cor, imgs_cor)
@@ -43,6 +54,7 @@ def get_imgs_and_masks(ids, dir_img, dir_cor, dir_gt, scale):
     gt_switched = map(hwc_to_chw, gt)
 
     return zip(imgs_switched, imgs_cor_switched, gt_switched)
+
 
 def get_full_img_and_mask(id, dir_img, dir_mask):
     im = Image.open(dir_img + id + '.jpg')

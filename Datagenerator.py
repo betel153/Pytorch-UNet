@@ -11,20 +11,20 @@ crop_size = (1024, 1024)
 # crop_size = (4096, 4096)
 
 # input folder
-input_dir = base_dir + 'datafolder/'
+input_dir = base_dir + 'saitama/'
 # input_dir = base_dir + 'test/raw/'
 
 # output folder
-sar_out_dir = base_dir + 'data_num/x6/sar/'
-cor_out_dir = base_dir + 'data_num/x6/cor/'
-gt_out_dir = base_dir + 'data_num/x6/gt/'
+# sar_out_dir = base_dir + 'data_num/x6/sar/'
+# cor_out_dir = base_dir + 'data_num/x6/cor/'
+# gt_out_dir = base_dir + 'data_num/x6/gt/'
 # sar_out_dir = base_dir + 'train_visual_4096/sar/'
 # cor_out_dir = base_dir + 'train_visual_4096/cor/'
 # gt_out_dir = base_dir + 'train_visual_4096/gt/'
 
-# sar_out_dir = base_dir + 'test/sar/'
-# cor_out_dir = base_dir + 'test/cor/'
-# gt_out_dir = base_dir + 'test/gt/'
+sar_out_dir = base_dir + 'test/sar/'
+cor_out_dir = base_dir + 'test/cor/'
+gt_out_dir = base_dir + 'test/gt/'
 
 ids = []
 for f in os.listdir(input_dir):
@@ -53,7 +53,7 @@ for id in ids:
         gt = np.transpose(f['data'][()].astype(np.float32), axes=[1, 0])
     with h5py.File(input_dir + id + '_xy.mat', 'r') as f:
         xy = np.transpose(f['data'][()].astype(np.int32), axes=[1, 0])
-        xy -= 1 # MATLABの時点で水準点のXY座標が全て1ずつずれているため補正
+        xy -= 1  # MATLABの時点で水準点のXY座標が全て1ずつずれているため補正
     h, w = sar.shape
 
     leveling_dot = []
@@ -71,7 +71,7 @@ for id in ids:
 
     print('　Creating ...')
     # for i, center in enumerate(leveling_dot_ag): # Training
-    for i, center in enumerate(leveling_dot): # Test
+    for i, center in enumerate(leveling_dot):  # Test
         sar_output = []
         c_h, c_w = center  # GT's center
         # decide top and left
@@ -84,7 +84,7 @@ for id in ids:
         count = 0
         while True:
             if left < 0:
-                left =  - left
+                left = - left
                 left += np.random.randint(0, w - right)
                 right = left + crop_size[1]
             if right > w:
@@ -100,16 +100,21 @@ for id in ids:
                 top -= np.random.randint(0, top)
                 bottom = top + crop_size[1]
             if c_h < top or c_h > bottom or c_w < left or c_w > right:
-                top = c_h - np.random.randint(crop_size[0] // 4, crop_size[0] // 2)
-                left = c_w - np.random.randint(crop_size[1] // 4, crop_size[1] // 2)
+                top = c_h - \
+                    np.random.randint(crop_size[0] // 4, crop_size[0] // 2)
+                left = c_w - \
+                    np.random.randint(crop_size[1] // 4, crop_size[1] // 2)
                 # decide bottom and right
                 bottom = top + crop_size[0]
                 right = left + crop_size[1]
             if left >= 0 and right <= w and top >= 0 and bottom <= h and c_h >= top and c_h <= bottom and c_w >= left and c_w <= right:
                 # print('Save now: ', id + '_' + str(i))
-                np.save(sar_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M'), sar[top:bottom, left:right])
-                np.save(cor_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_cor', cor[top:bottom, left:right])
-                np.save(gt_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_leveling', gt[top:bottom, left:right])
+                np.save(sar_out_dir + id + '_' + str(i) + '_' +
+                        dt_now.strftime('%Y%m%d%H%M'), sar[top:bottom, left:right])
+                np.save(cor_out_dir + id + '_' + str(i) + '_' +
+                        dt_now.strftime('%Y%m%d%H%M') + '_cor', cor[top:bottom, left:right])
+                np.save(gt_out_dir + id + '_' + str(i) + '_' +
+                        dt_now.strftime('%Y%m%d%H%M') + '_leveling', gt[top:bottom, left:right])
                 # np.save(gt_out_dir + id + '_' + str(i) + '_' + dt_now.strftime('%Y%m%d%H%M') + '_leveling', gt_test[top:bottom, left:right])
                 break
             if count > 20:

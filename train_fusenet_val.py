@@ -16,12 +16,16 @@ from torch.utils.tensorboard import SummaryWriter
 import datetime
 dt_now = datetime.datetime.now()
 
-dir_sar = '/home/shimosato/dataset/unet/data_num/x6/sar/'
-dir_cor = '/home/shimosato/dataset/unet/data_num/x6/cor/'
-dir_gt = '/home/shimosato/dataset/unet/data_num/x6/gt/'
+# dir_sar = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/sar/'
+# dir_cor = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/cor/'
+# dir_gt = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/gt/'
+dir_sar = '/home-local/shimosato/datasets/x5/sar/'
+dir_cor = '/home-local/shimosato/datasets/x5/cor/'
+dir_gt = '/home-local/shimosato/datasets/x5/gt/'
 dir_checkpoint = 'checkpoints/'
 
-dir_test = '/home/shimosato/dataset/unet/test/'
+dir_test = '/home-local/shimosato/datasets/test/'
+# dir_test = '/home/shimosato/dl001/shimosato/dataset/unet/test/'
 
 def train_net(net,
               device,

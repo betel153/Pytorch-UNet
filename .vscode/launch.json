@@ -17,11 +17,11 @@
                 "--epochs",
                 "200",
                 "--batch-size",
-                "2",
+                "8",
                 "--learning-rate",
                 "1e-05",
                 "--scale",
-                "0.5",
+                "1",
                 // "--input",
                 // "sample.npy",
                 // "--no-save"

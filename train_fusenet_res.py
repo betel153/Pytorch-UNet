@@ -16,9 +16,9 @@ from torch.utils.tensorboard import SummaryWriter
 import datetime
 dt_now = datetime.datetime.now()
 
-dir_sar = '/home/shimosato/dl001/shimosato/dataset/unet/train_x8/sar/'
-dir_cor = '/home/shimosato/dl001/shimosato/dataset/unet/train_x8/cor/'
-dir_gt = '/home/shimosato/dl001/shimosato/dataset/unet/train_x8/gt/'
+dir_sar = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/sar/'
+dir_cor = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/cor/'
+dir_gt = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/gt/'
 dir_checkpoint = 'checkpoints/'
 
 def train_net(net,
