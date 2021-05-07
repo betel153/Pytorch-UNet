@@ -15,6 +15,7 @@ from utils import get_ids, split_train_val, get_imgs_and_masks, batch
 from torch.utils.tensorboard import SummaryWriter
 import datetime
 import optuna
+from functools import partial
 dt_now = datetime.datetime.now()
 
 # dir_sar = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/sar/'
@@ -23,6 +24,9 @@ dt_now = datetime.datetime.now()
 dir_sar = '/home-local/shimosato/datasets/x5/sar/'
 dir_cor = '/home-local/shimosato/datasets/x5/cor/'
 dir_gt = '/home-local/shimosato/datasets/x5/gt/'
+# dir_sar = '/home-local/shimosato/datasets/test/sar/'
+# dir_cor = '/home-local/shimosato/datasets/test/cor/'
+# dir_gt = '/home-local/shimosato/datasets/test/gt/'
 dir_checkpoint = 'checkpoints/'
 
 dir_test = '/home-local/shimosato/datasets/test/'
@@ -31,116 +35,152 @@ dir_test = '/home-local/shimosato/datasets/test/'
 
 def train_net(net,
               device,
+              writer,
+              trial_num,
               epochs=5,
               batch_size=1,
               lr=0.1,
               val_percent=0.15,
               save_cp=True,
               img_scale=1):
-    ids = get_ids(dir_sar)
+    def objective(trial):
+        global trial_num
+        trial_num += 1
 
-    iddataset = split_train_val(ids, val_percent)
+        lr = trial.suggest_loguniform('lr', 1e-07, 1e-04)
+        sigma = trial.suggest_uniform('sigma', 0.1, 3.0)
 
-    writer = SummaryWriter(
-        comment=f'_Learning_rate_{lr}_Batch_size_{batch_size}')
+        ids = get_ids(dir_sar)
 
-    logging.info(f'''Starting training:
-        Epochs:          {epochs}
-        Batch size:      {batch_size}
-        Learning rate:   {lr}
-        Training size:   {len(iddataset["train"])}
-        Validation size: {len(iddataset["val"])}
-        Checkpoints:     {save_cp}
-        Device:          {device.type}
-    ''')
+        iddataset = split_train_val(ids, val_percent)
 
-    n_train = len(iddataset['train'])
-    n_val = len(iddataset['val'])
-    optimizer = optim.Adam(net.parameters(), lr=lr)
-    if net.module.n_classes > 1:
-        criterion = nn.CrossEntropyLoss()
-    else:
-        # criterion = nn.BCEWithLogitsLoss()
-        criterion = nn.MSELoss()        # MSE Loss
+        # writer = SummaryWriter(
+        #     comment=f'_Learning_rate_{lr}_Batch_size_{batch_size}')
 
-    loss_min = 100000
-    for epoch in range(epochs):
-        net.train()
+        logging.info(f'''Starting training:
+            Epochs:          {epochs}
+            Batch size:      {batch_size}
+            Learning rate:   {lr}
+            Training size:   {len(iddataset["train"])}
+            Validation size: {len(iddataset["val"])}
+            Checkpoints:     {save_cp}
+            Device:          {device.type}
+            Trial id:        {trial_num}
+        ''')
 
-        # reset the generators
-        train = get_imgs_and_masks(
-            iddataset['train'], dir_sar, dir_cor, dir_gt, img_scale)
-        val = get_imgs_and_masks(
-            iddataset['val'], dir_sar, dir_cor, dir_gt, img_scale)
+        best_valid_accuracy = 10000.0
+        n_train = len(iddataset['train'])
+        n_val = len(iddataset['val'])
+        optimizer = optim.Adam(net.parameters(), lr=lr)
+        if net.module.n_classes > 1:
+            criterion = nn.CrossEntropyLoss()
+        else:
+            # criterion = nn.BCEWithLogitsLoss()
+            criterion = nn.MSELoss()        # MSE Loss
 
-        with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
-            epoch_loss = 0
-            # epoch_loss_input = 0
-            for i, b in enumerate(batch(train, batch_size)):
-                imgs_sar = np.array([i[0] for i in b]).astype(np.float32)
-                imgs_cor = np.array([i[1] for i in b]).astype(np.float32)
-                gt = np.array([i[2] for i in b]).astype(np.float32)
-                gt_mask = np.where(gt != 0, 1, 0)  # mask
+        loss_min = 100000
+        for epoch in range(epochs):
+            net.train()
 
-                imgs_sar = torch.from_numpy(imgs_sar)
-                imgs_cor = torch.from_numpy(imgs_cor)
-                gt = torch.from_numpy(gt)
-                gt_mask = torch.from_numpy(gt_mask)
+            # reset the generators
+            train = get_imgs_and_masks(
+                iddataset['train'], dir_sar, dir_cor, dir_gt, img_scale, sigma)
+            val = get_imgs_and_masks(
+                iddataset['val'], dir_sar, dir_cor, dir_gt, img_scale, sigma)
 
-                imgs_sar = imgs_sar.to(device=device)
-                imgs_cor = imgs_cor.to(device=device)
-                gt = gt.to(device=device)
-                gt_mask = gt_mask.to(device=device)
+            with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
+                epoch_loss = 0
+                # epoch_loss_input = 0
+                for i, b in enumerate(batch(train, batch_size)):
+                    imgs_sar = np.array([i[0] for i in b]).astype(np.float32)
+                    imgs_cor = np.array([i[1] for i in b]).astype(np.float32)
+                    gt = np.array([i[2] for i in b]).astype(np.float32)
+                    gt_mask = np.where(gt != 0, 1, 0)  # mask
 
-                # Check input mse_loss
-                # loss_input = criterion(imgs_sar * gt_mask, gt)
-                # epoch_loss_input += loss_input.item()
+                    imgs_sar = torch.from_numpy(imgs_sar)
+                    imgs_cor = torch.from_numpy(imgs_cor)
+                    gt = torch.from_numpy(gt)
+                    gt_mask = torch.from_numpy(gt_mask)
 
-                pred_def = net(imgs_sar, imgs_cor)
-                pred_def_mask = pred_def * gt_mask
-                gt_index = torch.nonzero(gt, as_tuple=True)
-                # loss = criterion(pred_def_mask, gt)
-                loss = criterion(pred_def[gt_index], gt[gt_index])
-                epoch_loss += loss.item()
-                pbar.set_postfix(**{'loss (batch)': loss.item()})
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+                    imgs_sar = imgs_sar.to(device=device)
+                    imgs_cor = imgs_cor.to(device=device)
+                    gt = gt.to(device=device)
+                    gt_mask = gt_mask.to(device=device)
 
-                pbar.update(batch_size)
-            logging.info('Train Loss: {}'.format(epoch_loss))
-            writer.add_scalar('Loss/Train', epoch_loss /
-                              len(iddataset["train"]), epoch+1)
+                    # Check input mse_loss
+                    # loss_input = criterion(imgs_sar * gt_mask, gt)
+                    # epoch_loss_input += loss_input.item()
 
-        val_score = eval_net_test(net, val, device, n_val)
-        writer.add_scalar('Loss/Test', val_score, epoch+1)
-        # if net.module.n_classes > 1:
-        #     logging.info('Validation cross entropy: {}'.format(val_score))
-        #     writer.add_scalar('Loss/Validation', val_score, epoch+1)
-        # else:
-        #     logging.info('Validation MSE: {}'.format(val_score))
-        #     writer.add_scalar('Loss/Validation', val_score, epoch+1)
+                    pred_def = net(imgs_sar, imgs_cor)
+                    pred_def_mask = pred_def * gt_mask
+                    gt_index = torch.nonzero(gt, as_tuple=True)
+                    # loss = criterion(pred_def_mask, gt)
+                    loss = criterion(pred_def[gt_index], gt[gt_index])
+                    epoch_loss += loss.item()
+                    pbar.set_postfix(**{'loss (batch)': loss.item()})
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
 
-        if save_cp:
-            try:
-                data_lr_Bs = dt_now.strftime(
-                    '%Y%m%d%H%M')+'_Lr_'+str(lr)+'_Bs_'+str(batch_size)+'/'
-                os.mkdir(dir_checkpoint + data_lr_Bs)
-                logging.info('Created checkpoint directory')
-            except OSError:
-                pass
-            # torch.save(net.state_dict(), dir_checkpoint + data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
-            if loss_min >= epoch_loss:
-                torch.save(net.module.state_dict(), dir_checkpoint +
-                           data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
-                logging.info(f'Checkpoint {epoch + 1} saved !')
-                loss_min = epoch_loss
-            else:
-                logging.info(f'Skip Checkpoint {epoch + 1} !')
-    # print('Input MSE_Loss:',epoch_loss_input)
-    writer.close()
+                    pbar.update(batch_size)
+                logging.info('Train Loss: {}'.format(epoch_loss))
+                # writer.add_scalar('Loss/Train', epoch_loss /
+                #                   len(iddataset["train"]), epoch+1)
+                writer.add_scalars('Loss/Train', {'trial_{:02d}_lr_{:.2e}_sigma_{:.2f}'.format(
+                    trial_num, lr, sigma): epoch_loss / len(iddataset["train"])}, epoch+1)
+                writer.flush()
 
-    return 
+            val_score = eval_net_test(net, val, device, n_val)
+            # writer.add_scalar('Loss/Test', val_score, epoch+1)
+            writer.add_scalars('Loss/Test', {'trial_{:02d}_lr_{:.2e}_sigma_{:.2f}'.format(
+                trial_num, lr, sigma): val_score}, epoch+1)
+            writer.flush()
+
+            if val_score <= best_valid_accuracy:
+                best_valid_accuracy = val_score
+
+            # writer.add_hparams({'lr': lr, 'sigma': sigma},
+            #                    {'test/loss': val_score})
+
+            # if net.module.n_classes > 1:
+            #     logging.info('Validation cross entropy: {}'.format(val_score))
+            #     writer.add_scalar('Loss/Validation', val_score, epoch+1)
+            # else:
+            #     logging.info('Validation MSE: {}'.format(val_score))
+            #     writer.add_scalar('Loss/Validation', val_score, epoch+1)
+
+            if save_cp:
+                try:
+                    data_lr_Bs = dt_now.strftime(
+                        '%Y%m%d%H%M')+'_trial_' + str(trial_num) + '_Lr_'+str(lr)+'_Bs_'+str(batch_size)+'_Sigma_'+str(round(sigma, 2))+'/'
+                    os.mkdir(dir_checkpoint + data_lr_Bs)
+                    logging.info('Created checkpoint directory')
+                except OSError:
+                    pass
+                # torch.save(net.state_dict(), dir_checkpoint + data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
+                if loss_min >= epoch_loss:
+                    torch.save(net.module.state_dict(), dir_checkpoint +
+                               data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
+                    logging.info(f'Checkpoint {epoch + 1} saved !')
+                    loss_min = epoch_loss
+                else:
+                    logging.info(f'Skip Checkpoint {epoch + 1} !')
+
+        global best_accuracy
+        if best_valid_accuracy <= best_accuracy:
+            best_accuracy = best_valid_accuracy
+            global best_num
+            best_num = trial_num
+
+        print('best_valid_accuracy of this trial: {:.3f}'.format(
+            best_valid_accuracy))
+        print('best_accuracy of trials : {:.3f}'.format(best_accuracy))
+        print('best_num of trials: {:.3f}'.format(best_num))
+        print('Finished Training')
+
+        return val_score
+        # print('Input MSE_Loss:',epoch_loss_input)
+    return objective
 
 
 def get_args():
@@ -203,16 +243,61 @@ if __name__ == '__main__':
     # faster convolutions, but more memory
     torch.backends.cudnn.benchmark = True
 
+    # current_time = dt_now.strftime('%b%d-%Y-%H-%M-%S')
+    # log_dir = os.path.join('runs', current_time)
+    # writer = SummaryWriter(log_dir=log_dir)
+    writer = SummaryWriter(log_dir='runs_optuna_sigma/2021_0429_20/')
+    trial_num = -1  # trial number of optuna
+    best_accuracy = 10000.0  # best valid accuracy of optuna trials
+    best_num = -1  # best trial number of optuna
+
 try:
-    train_net(net=net,
-              epochs=args.epochs,
-              batch_size=args.batchsize,
-              lr=args.lr,
-              device=device,
-              img_scale=args.scale,
-              val_percent=args.val / 100)
+    # 最適化のセッションを作る
+    study = optuna.create_study(
+        pruner=optuna.pruners.MedianPruner(),
+        study_name='optuna_smoothing_lr_and_sigma',
+        storage='sqlite:///optuna_database/optuna_smoothing_lr_and_sigma.db',
+        load_if_exists=True
+    )
+
+    # 50 回試行する
+    study.optimize(
+        train_net(net=net,
+                  epochs=args.epochs,
+                  batch_size=args.batchsize,
+                  lr=args.lr,
+                  device=device,
+                  img_scale=args.scale,
+                  val_percent=args.val / 100,
+                  writer=writer,
+                  trial_num=trial_num),
+        n_trials=50)
+
+    print('Best params : {}'.format(study.best_params))
+    print('Best value  : {}'.format(study.best_value))
+    print('Best trial  : {}'.format(study.best_trial))
+
+    df = study.trials_dataframe()
+    print(df)
+
+    df_records = df.to_dict(orient='records')
+
+    for i in range(len(df_records)):
+        df_records[i]['datetime_start'] = str(
+            df_records[i]['datetime_start'])
+        df_records[i]['datetime_complete'] = str(
+            df_records[i]['datetime_complete'])
+        df_records[i]['duration'] = str(
+            df_records[i]['duration'])
+        value = df_records[i].pop('value')
+        value_dict = {'value': value}
+        writer.add_hparams(df_records[i], value_dict)
+
+    writer.flush()
+    writer.close()
+
 except KeyboardInterrupt:
-    torch.save(net.state_dict(), 'INTERRUPTED.pth')
+    torch.save(net.state_dict(), 'INTERRUPTED_smooth.pth')
     logging.info('Saved interrupt')
     try:
         sys.exit(0)

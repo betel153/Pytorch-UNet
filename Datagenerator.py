@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import scipy.io as sio
 import os
@@ -11,7 +12,7 @@ crop_size = (1024, 1024)
 # crop_size = (4096, 4096)
 
 # input folder
-input_dir = base_dir + 'saitama/'
+input_dir = base_dir + 'aichi/'
 # input_dir = base_dir + 'test/raw/'
 
 # output folder
@@ -22,9 +23,11 @@ input_dir = base_dir + 'saitama/'
 # cor_out_dir = base_dir + 'train_visual_4096/cor/'
 # gt_out_dir = base_dir + 'train_visual_4096/gt/'
 
-sar_out_dir = base_dir + 'test/sar/'
-cor_out_dir = base_dir + 'test/cor/'
-gt_out_dir = base_dir + 'test/gt/'
+sar_out_dir = base_dir + 'aichi_train_test/test/sar/'
+cor_out_dir = base_dir + 'aichi_train_test/test/cor/'
+gt_out_dir = base_dir + 'aichi_train_test/test/gt/'
+
+random.seed(0)
 
 ids = []
 for f in os.listdir(input_dir):
@@ -58,9 +61,41 @@ for id in ids:
 
     leveling_dot = []
 
+    # im_gray = np.zeros_like(sar)
     for index in xy:
         if index.all() and index[0] < h and index[1] < w:
             leveling_dot.append(index)
+            # for i in range(20):
+            #     for j in range(20):
+            #         im_gray[index[0]-10+i, index[1]-10+j] = 255
+
+    # if id == 'aichi2016IW1':
+    #     test_leveling = random.sample(leveling_dot, 100)
+    #     np.save('test_leveling.npy', test_leveling)
+    # for i in test_leveling:
+    #     gt[tuple(i)] = 0
+    #     for j in leveling_dot:
+    #         if np.all(i == j):
+    #             leveling_dot = [
+    #                 s for s in leveling_dot if not np.all(s == j)]
+
+    leveling_dot = np.load('test_leveling.npy')
+
+    # Image.fromarray(im_gray.astype(np.uint8)).save('leveling.jpg')
+
+    # if os.path.isfile('leveling_data.npy'):
+    #     leve_data = np.load('leveling_data.npy')
+    #     for i in leveling_dot:
+    #         for j in leve_data:
+    #             if i == j:
+    #                 print('座標: ', i)
+    #     tmp = np.concatenate([leveling_dot, leve_data])
+    #     leveling_dot = np.unique(tmp)
+    # else:
+    #     leve_data = None
+
+    # np.save('leveling_data.npy', leveling_dot)
+    # continue
 
     # leveling_dot_ag = []
     # for m_x, m_y in leveling_dot:

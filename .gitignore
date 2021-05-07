@@ -9,3 +9,6 @@ envunet/
 runs/
 tensorboard/
 *.npy
+optuna_database/
+runs_optuna_reconstruction/
+runs_optuna_sigma/

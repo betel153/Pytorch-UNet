@@ -9,17 +9,18 @@ import torch.nn as nn
 from torch import optim
 from tqdm import tqdm
 
-from eval import eval_net
+from eval import eval_net_test
 from unet import UNet_fusenet_res
 from utils import get_ids, split_train_val, get_imgs_and_masks, batch
 from torch.utils.tensorboard import SummaryWriter
 import datetime
 dt_now = datetime.datetime.now()
 
-dir_sar = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/sar/'
-dir_cor = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/cor/'
-dir_gt = '/home/shimosato/dl001/shimosato/dataset/unet/data_num/x5/gt/'
+dir_sar = '/home-local/shimosato/datasets/x5/sar/'
+dir_cor = '/home-local/shimosato/datasets/x5/cor/'
+dir_gt = '/home-local/shimosato/datasets/x5/gt/'
 dir_checkpoint = 'checkpoints/'
+
 
 def train_net(net,
               device,
@@ -33,7 +34,8 @@ def train_net(net,
 
     iddataset = split_train_val(ids, val_percent)
 
-    writer = SummaryWriter(comment=f'_Learning_rate_{lr}_Batch_size_{batch_size}')
+    writer = SummaryWriter(
+        comment=f'_Learning_rate_{lr}_Batch_size_{batch_size}')
 
     logging.info(f'''Starting training:
         Epochs:          {epochs}
@@ -59,8 +61,10 @@ def train_net(net,
         net.train()
 
         # reset the generators
-        train = get_imgs_and_masks(iddataset['train'], dir_sar, dir_cor, dir_gt, img_scale)
-        val = get_imgs_and_masks(iddataset['val'], dir_sar, dir_cor, dir_gt, img_scale)
+        train = get_imgs_and_masks(
+            iddataset['train'], dir_sar, dir_cor, dir_gt, img_scale)
+        val = get_imgs_and_masks(
+            iddataset['val'], dir_sar, dir_cor, dir_gt, img_scale)
 
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
             epoch_loss = 0
@@ -98,8 +102,15 @@ def train_net(net,
 
                 pbar.update(batch_size)
             logging.info('Train Loss: {}'.format(epoch_loss))
-            writer.add_scalar('Loss/Train', epoch_loss / len(iddataset["train"]), epoch+1)
+            writer.add_scalar('Loss/Train', epoch_loss /
+                              len(iddataset["train"]), epoch+1)
 
+            writer.flush()
+
+        val_score = eval_net_test(net, val, device, n_val)
+        # writer.add_scalar('Loss/Test', val_score, epoch+1)
+        writer.add_scalar('Loss/Test', val_score, epoch+1)
+        writer.flush()
 
         # val_score = eval_net(net, val, device, n_val)
         # if net.module.n_classes > 1:
@@ -111,20 +122,23 @@ def train_net(net,
 
         if save_cp:
             try:
-                data_lr_Bs = dt_now.strftime('%Y%m%d%H%M')+'_Lr_'+str(lr)+'_Bs_'+str(batch_size)+'/'
+                data_lr_Bs = dt_now.strftime(
+                    '%Y%m%d%H%M')+'_Lr_'+str(lr)+'_Bs_'+str(batch_size)+'/'
                 os.mkdir(dir_checkpoint + data_lr_Bs)
                 logging.info('Created checkpoint directory')
             except OSError:
                 pass
             # torch.save(net.state_dict(), dir_checkpoint + data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
             if loss_min >= epoch_loss:
-                torch.save(net.module.state_dict(), dir_checkpoint + data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
+                torch.save(net.module.state_dict(), dir_checkpoint +
+                           data_lr_Bs + f'CP_epoch{epoch + 1}.pth')
                 logging.info(f'Checkpoint {epoch + 1} saved !')
                 loss_min = epoch_loss
             else:
                 logging.info(f'Skip Checkpoint {epoch + 1} !')
     # print('Input MSE_Loss:',epoch_loss_input)
     writer.close()
+
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
@@ -154,7 +168,8 @@ def pretrain_checks():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    logging.basicConfig(level=logging.INFO,
+                        format='%(levelname)s: %(message)s')
     args = get_args()
     pretrain_checks()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

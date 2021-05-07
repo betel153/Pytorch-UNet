@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 from .utils import resize_and_crop, normalize_sar, normalize_cor, hwc_to_chw
-from scipy import ndimage
+import scipy.io as sio
 
 
 def get_ids(dir):
@@ -24,21 +24,9 @@ def to_cropped_imgs(ids, dir, suffix, scale):
         yield im
 
 
-def to_cropped_imgs_sar(ids, dir, suffix, scale):
-    """From a list of tuples, returns the correct cropped img"""
-    for id in ids:
-        # im = resize_and_crop(Image.open(dir + id + suffix), scale=scale) # original
-
-        # MATLAB file
-        im = resize_and_crop(np.load(dir + id + suffix), scale)    # import
-        im = ndimage.filters.gaussian_filter(im, 0.1)  # gaussian_filter
-        yield im
-
-
 def get_imgs_and_masks(ids, dir_img, dir_cor, dir_gt, scale):
     """Return all the couples (img, mask)"""
-    imgs = to_cropped_imgs_sar(
-        ids, dir_img, '.npy', scale)  # change jpg to mat
+    imgs = to_cropped_imgs(ids, dir_img, '.npy', scale)  # change jpg to mat
     imgs_cor = to_cropped_imgs(
         ids, dir_cor, '_cor.npy', scale)  # change jpg to mat
 

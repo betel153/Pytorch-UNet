@@ -5,6 +5,6 @@
 		}
 	],
 	"settings": {
-		"python.pythonPath": "/home/shimosato/.pyenv/versions/env/bin/python"
+		"python.pythonPath": "/home/shimosato/.pyenv/versions/unet-dl40/bin/python"
 	}
 }
